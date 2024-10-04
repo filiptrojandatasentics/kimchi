@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "disable_existing_loggers": true,
+    "formatters": {
+        "standard": {
+            "format": "[%(levelname)s] %(asctime)s.%(msecs)03d %(module)s:%(lineno)s %(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S"
+        }
+    },
+    "handlers": {
+        "default": {
+            "level": "INFO",
+            "formatter": "standard",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout"
+        }
+    },
+    "loggers": {
+        "": {
+            "handlers": ["default"],
+            "level": "INFO",
+            "propagate": false
+        },
+        "dpd": {
+            "handlers": ["default"],
+            "level": "DEBUG",
+            "propagate": false
+        },
+        "__main__": {
+            "handlers": ["default"],
+            "level": "DEBUG",
+            "propagate": false
+        }
+    }
+}
