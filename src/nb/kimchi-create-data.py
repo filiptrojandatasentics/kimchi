@@ -315,4 +315,10 @@ ps.DataFrame(res_df).to_table("kimchi.default.lux")
 
 # COMMAND ----------
 
-
+from pyspark.sql.functions import sequence, to_date, explode, col, weekofyear, dayofweek, year
+df = spark.sql("SELECT sequence(to_date('2024-01-01'), to_date('2024-12-31'), interval 1 day) as date_valid")
+df = df.withColumn("date_valid", explode(col("date_valid")))
+df = df.withColumn("year", year(col("date_valid")))
+df = df.withColumn("week", weekofyear(col("date_valid")))
+df = df.withColumn("dow", dayofweek(col("date_valid")))
+df.write.format("delta").mode("overwrite").saveAsTable("kimchi.default.calendar")
