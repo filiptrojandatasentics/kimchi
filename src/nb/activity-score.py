@@ -6,7 +6,7 @@
 # MAGIC   b.tst,
 # MAGIC   b.event_type,
 # MAGIC   b.se_action
-# MAGIC from kimchi.default.obs a
+# MAGIC from (select * from kimchi.default.obs) a  -- use limit X to limit the number of observations
 # MAGIC inner join kimchi.default.lux b 
 # MAGIC on a.cluid = b.cluid and b.tst between date_add(a.observation_date, -90) and a.observation_date;
 # MAGIC
@@ -19,18 +19,17 @@
 
 # COMMAND ----------
 
+import os
+os.chdir("/Workspace/Users/filip.trojan@datasentics.com/kimchi")
+
+# COMMAND ----------
+
 import pandas as pd
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 import pyspark.pandas as ps
-
-# COMMAND ----------
-
-output_schema = T.StructType([
-    T.StructField("cluid", T.StringType()),
-    T.StructField("observation_date", T.DateType()),
-    T.StructField("score", T.FloatType())
-])
+from src.common import log_utils
+logger = log_utils.get_script_logger()
 
 # COMMAND ----------
 
@@ -69,48 +68,56 @@ minor_signals = [
     "store_landing_page_displayed",
 ]
 
-def update_score(s: float, days_since_last_session: float | None, event_type: str, se_action: str):
-    x = s
+def update_score(s0: float, days_since_last_event: float | None, days_since_last_session: float | None, event_type: str, se_action: str):
+    x = s0
+    if days_since_last_event is not None:
+        x -= 5.0 * days_since_last_event
     if days_since_last_session is not None:
-        x -= days_since_last_session * (10/7)
+        logger.debug(f"{days_since_last_session=}")
     for k, v in main_signals.items():
         if se_action == k:
-            x += v
+            x += 1.0 * v
+            logger.debug(f"main signal {k} {v:+1.1f}")
     for s in minor_signals:
         if se_action == s:
-            x += 2
+            x += 2.0
+            logger.debug(f"minor signal {s}")
     # capping
-    if x < -50:
-        x = -50
-    elif x > 500:
-        x = 50
+    x = -50 if x < -50 else x
+    x = +50 if x > +50 else x
+    logger.debug(f"update_score({s0:.1f}, {days_since_last_event}, {days_since_last_session}, {event_type}, {se_action}) -> {x:.1f}")
     return x
 
 def pd_activity_score(df: pd.DataFrame) -> pd.Series:
     days_history = (df.tst.max() - df.tst.min()).days
     score = 0.0
     tst_last_session: pd.Timestamp | None = None
+    tst_last_event: pd.Timestamp | None = None
     days_since_last_session: float | None = None
+    days_since_last_event: float | None = None
     for x in df.itertuples():
-        score = update_score(score, days_since_last_session, x.event_type, x.se_action)
-        if x.event_type == "session_started":
+        score = update_score(score, days_since_last_event, days_since_last_session, x.event_type, x.se_action)
+        if x.se_action == "session_started":
             if tst_last_session is not None:
                 days_since_last_session = (x.tst - tst_last_session).total_seconds() / 86400
             tst_last_session = x.tst
+        if tst_last_event is not None:
+            days_since_last_event = (x.tst - tst_last_event).total_seconds() / 86400
+        tst_last_event = x.tst
     res = pd.Series(dict(score=score))
+    logger.debug(f"final score: {score:.1f}")
     return res
 
 # COMMAND ----------
 
+logger.info("started")
 obs_data = spark.sql("""
     select cluid, observation_date, tst, event_type, se_action 
     from kimchi.default.obs_data 
     order by cluid, observation_date, tst
-    limit 1000
     """
 ).toPandas()
 scores = obs_data.groupby(["cluid", "observation_date"]).apply(pd_activity_score).reset_index()
-scores.head(10)
 
 # COMMAND ----------
 
