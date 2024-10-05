@@ -2,6 +2,14 @@ score_lb = -50
 score_ub = +50
 decay_per_day = 5.0  # changed from suggested 10/7 (10 pts every week)
 
+session_delay_rule = [
+    (0.00, 0.80, +5.0),
+    (0.80, 1.20,  0.0),
+    (1.20, 1.35, -5.0),
+    (1.35, 1.50, -7.5),
+    (1.50, float("+inf"), -10.0),
+]
+
 main_signals = {
     "session_started": 20,
     "securities_account_overview_displayed": 15,

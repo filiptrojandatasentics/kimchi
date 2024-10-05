@@ -23,7 +23,7 @@ def pd_activity_score(df: pd.DataFrame) -> pd.Series:
 
 def update_score(x0: float, f: tuple) -> float:
     x = update_last_event(x0, f.days_since_last_event)
-    x = update_last_session(x, f.days_since_last_session)
+    x = update_last_session(x, f.se_action, f.days_since_last_session, f.n_sessions_30d)
     x = update_signal(x, f.se_action)
     x = capping(x)
     logger.debug(f"update_score({x0:.1f}, {f}) -> {x:.1f}")
@@ -37,10 +37,16 @@ def update_last_event(x0: float, days_since_last_event: float | None) -> float:
     return x
 
 
-def update_last_session(x0: float, days_since_last_session: float | None) -> float:
+def update_last_session(x0: float, se_action: str, days_since_last_session: float | None, n_sessions_30d: float | None) -> float:
     x = x0
-    if days_since_last_session is not None:
-        logger.debug(f"{days_since_last_session=}")
+    if se_action == "session_started" and days_since_last_session and n_sessions_30d:
+        avg_days_between_sessions_30d = 30 / (n_sessions_30d + 1)
+        last_session_delay = days_since_last_session / avg_days_between_sessions_30d - 1
+        for r in config.session_delay_rule:
+            (lb, ub, pts) = r
+            if last_session_delay >= lb and last_session_delay < ub:
+                x += pts
+                logger.debug(f"{last_session_delay=}: {pts} points added")
     return x
 
 
