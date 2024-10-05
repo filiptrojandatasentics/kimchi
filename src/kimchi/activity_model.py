@@ -1,7 +1,4 @@
 import pandas as pd
-from pyspark.sql import functions as F
-from pyspark.sql import types as T
-import pyspark.pandas as ps
 from src.common import log_utils
 from src.kimchi import config
 
@@ -39,14 +36,15 @@ def update_last_event(x0: float, days_since_last_event: float | None) -> float:
 
 def update_last_session(x0: float, se_action: str, days_since_last_session: float | None, n_sessions_30d: float | None) -> float:
     x = x0
-    if se_action == "session_started" and days_since_last_session and n_sessions_30d:
+    if se_action == "session_started" and days_since_last_session is not None and n_sessions_30d is not None:
         avg_days_between_sessions_30d = 30 / (n_sessions_30d + 1)
         last_session_delay = days_since_last_session / avg_days_between_sessions_30d - 1
+        logger.info(f"{last_session_delay=}")
         for r in config.session_delay_rule:
             (lb, ub, pts) = r
             if last_session_delay >= lb and last_session_delay < ub:
                 x += pts
-                logger.debug(f"{last_session_delay=}: {pts} points added")
+                logger.info(f"{last_session_delay=}: {pts} points added")
     return x
 
 
