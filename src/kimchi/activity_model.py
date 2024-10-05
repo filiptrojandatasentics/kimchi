@@ -23,8 +23,7 @@ def update_score(x0: float, f: tuple) -> float:
     d2 = delta_last_session(f.se_action, f.days_since_last_session, f.n_sessions_30d)
     d3 = update_signal(f.se_action)
     d = d1 + d2 + d3
-    x = x0 + d
-    x = capping(x)
+    x = weir(x0, d)
     logger.debug(f"update_score({f}): {x0:.1f} {d:+.1f} = {x:.1f}")
     return x
 
@@ -56,8 +55,7 @@ def update_signal(se_action: str) -> float:
     return d
 
 
-def capping(x0: float) -> float:
-    x = x0
-    x = config.score_lb if x < config.score_lb else x
-    x = config.score_ub if x > config.score_ub else x
+def weir(x0: float, d: float) -> float:
+    a = 1 - (x0/50) ** 2
+    x = x0 + a * d
     return x
