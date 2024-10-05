@@ -19,23 +19,26 @@ def pd_activity_score(df: pd.DataFrame) -> pd.Series:
 
 
 def update_score(x0: float, f: tuple) -> float:
-    x = update_last_event(x0, f.days_since_last_event)
-    x = update_last_session(x, f.se_action, f.days_since_last_session, f.n_sessions_30d)
-    x = update_signal(x, f.se_action)
+    d1 = delta_last_event(f.days_since_last_event)
+    d2 = delta_last_session(f.se_action, f.days_since_last_session, f.n_sessions_30d)
+    d3 = update_signal(f.se_action)
+    d = d1 + d2 + d3
+    x = x0 + d
     x = capping(x)
-    logger.debug(f"update_score({x0:.1f}, {f}) -> {x:.1f}")
+    logger.debug(f"update_score({f}): {x0:.1f} {d:+.1f} = {x:.1f}")
     return x
 
 
-def update_last_event(x0: float, days_since_last_event: float | None) -> float:
-    x = x0
+def delta_last_event(days_since_last_event: float | None) -> float:
     if days_since_last_event is not None:
-        x -= config.decay_per_day * days_since_last_event
-    return x
+        d = -config.decay_per_day * days_since_last_event
+    else:
+        d = 0.0
+    return d
 
 
-def update_last_session(x0: float, se_action: str, days_since_last_session: float | None, n_sessions_30d: float | None) -> float:
-    x = x0
+def delta_last_session(se_action: str, days_since_last_session: float | None, n_sessions_30d: float | None) -> float:
+    d = 0.0
     if se_action == "session_started" and days_since_last_session is not None and n_sessions_30d is not None:
         avg_days_between_sessions_30d = 30 / (n_sessions_30d + 1)
         last_session_delay = days_since_last_session / avg_days_between_sessions_30d - 1
@@ -43,14 +46,14 @@ def update_last_session(x0: float, se_action: str, days_since_last_session: floa
         for r in config.session_delay_rule:
             (lb, ub, pts) = r
             if last_session_delay >= lb and last_session_delay < ub:
-                x += pts
+                d = pts
                 logger.info(f"{last_session_delay=}: {pts} points added")
-    return x
+    return d
 
 
-def update_signal(x0: float, se_action: str) -> float:
-    x = x0 + config.signals.get(se_action, 0.0)
-    return x
+def update_signal(se_action: str) -> float:
+    d = config.signals.get(se_action, 0.0)
+    return d
 
 
 def capping(x0: float) -> float:
