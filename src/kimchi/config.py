@@ -1,6 +1,6 @@
 score_lb = -50
 score_ub = +50
-decay_per_day = 5.0  # changed from suggested 10/7 (10 pts every week)
+decay_per_day = 10.0  # changed from suggested 10/7 (10 pts every week)
 
 session_delay_rule = [
     (float("-inf"), -0.20, +5.0),
